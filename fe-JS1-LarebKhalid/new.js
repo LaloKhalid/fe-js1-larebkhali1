@@ -1,125 +1,126 @@
-const url1 = "https://api.themoviedb.org/3/trending/movie/day?language=en-US&api_key=de2010f82cfd0ea2d11da20b9cb0c687";
-const img_url = 'https://image.tmdb.org/t/p/w500';
+const API_KEY = 'de2010f82cfd0ea2d11da20b9cb0c687';
+const IMG_URL = 'https://image.tmdb.org/t/p/w500';
 const main = document.getElementById('main');
 
-getMovies(url1);
+const btnPopular = document.getElementById('btnPopular');
+const btnTopRated = document.getElementById('btnTopRated');
 
-function getMovies(url) {
-    fetch(url)
-        .then(res => {
-            if (!res.ok) {
-                throw new Error("Network response was not ok");
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (data.results.length === 0) {
-                showMessage("No trending movies found.");
-            } else {
-                showMovies(data.results);
-            }
-        })
-        .catch(err => {
-            console.error("Fetch error:", err);
-            showMessage("Oops! Something went wrong. Please try again later.");
-        });
-}
+const form = document.getElementById('form');
+const searchInput = document.getElementById('search-input');
+const searchType = document.getElementById('searchType');
 
-function showMovies(data) {
-    main.innerHTML = '';
-    data.forEach(movie => {
-        const { title, poster_path, vote_average, overview } = movie;
-        const movieEl = document.createElement('div');
-        movieEl.classList.add('movie');
-        movieEl.innerHTML = `
-            <img src="${img_url + poster_path}" alt="${title}">
-            <div class="movie-info">
-                <h3>${title}</h3>
-                <span class="${getColor(vote_average)}">${vote_average}</span>
-            </div>
-            <div class="overview">
-                <h3>Overview</h3>
-                ${overview}
-            </div>
-        `;
-        main.appendChild(movieEl);
+const trendingMoviesURL = `https://api.themoviedb.org/3/trending/movie/day?language=en-US&api_key=${API_KEY}`;
+
+getMovies(trendingMoviesURL);
+
+btnPopular.addEventListener('click', () => {
+  getMovies(`https://api.themoviedb.org/3/movie/popular?api_key=${API_KEY}&language=en-US&page=1`, 10);
+});
+
+btnTopRated.addEventListener('click', () => {
+  getMovies(`https://api.themoviedb.org/3/movie/top_rated?api_key=${API_KEY}&language=en-US&page=1`, 10);
+});
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const searchTerm = searchInput.value.trim();
+  if (searchTerm === '') {
+    alert('Please enter a search term.');
+    return;
+  }
+
+  const type = searchType.value; // 'movie' or 'person'
+  const searchUrl = `https://api.themoviedb.org/3/search/${type}?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(searchTerm)}&page=1&include_adult=false`;
+
+  fetch(searchUrl)
+    .then(res => res.json())
+    .then(data => {
+      if (data.results.length === 0) {
+        main.innerHTML = `<p style="color:red; text-align:center;">No results found for "${searchTerm}".</p>`;
+      } else {
+        if (type === 'person') {
+          showPeople(data.results);
+        } else {
+          showMovies(data.results);
+        }
+      }
+    })
+    .catch(() => {
+      main.innerHTML = '<p style="color:red; text-align:center;">Failed to fetch search results.</p>';
+    });
+});
+
+function getMovies(url, limit = 20) {
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+      const movies = data.results.slice(0, limit);
+      showMovies(movies);
+    })
+    .catch(() => {
+      main.innerHTML = '<p style="color:red; text-align:center;">Failed to fetch movies.</p>';
     });
 }
 
-function getColor(vote) {
-    if (vote >= 8) return "green";
-    else if (vote >= 5) return "orange";
-    else return 'red';
-}
+function showMovies(movies) {
+  main.innerHTML = '';
+  movies.forEach(movie => {
+    const { title, poster_path, vote_average, overview, release_date } = movie;
 
-function showMessage(message) {
-    main.innerHTML = `
-        <div style="color: white; font-size: 1.2rem; padding: 2rem; text-align: center;">
-            ${message}
-        </div>
+    const movieEl = document.createElement('div');
+    movieEl.classList.add('movie');
+
+    movieEl.innerHTML = `
+      <img src="${poster_path ? IMG_URL + poster_path : 'images/no-image-available.png'}" alt="${title}" />
+      <div class="movie-info">
+        <h3>${title}</h3>
+        <span class="${getColor(vote_average)}">${vote_average}</span>
+      </div>
+      <div class="overview">
+        <h3>Overview</h3>
+        ${overview || 'No overview available.'}
+        <p><strong>Release Date:</strong> ${release_date || 'N/A'}</p>
+      </div>
     `;
+
+    main.appendChild(movieEl);
+  });
 }
 
-// Person search form logic
-const form = document.getElementById('form');
-const searchInput = document.getElementById('search-input');
+function showPeople(people) {
+  main.innerHTML = '';
+  people.forEach(person => {
+    const { name, profile_path, known_for } = person;
 
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const searchTerm = searchInput.value.trim();
+    const personEl = document.createElement('div');
+    personEl.classList.add('movie'); // Reuse the same styling for simplicity
 
-    if (searchTerm) {
-        searchPerson(searchTerm);
-        searchInput.value = '';
-    }
-});
+    const knownForTitles = known_for
+      .map(item => item.title || item.name || '')
+      .filter(Boolean)
+      .join(', ');
 
-async function searchPerson(name) {
-    const apiKey = 'de2010f82cfd0ea2d11da20b9cb0c687';
-    const url = `https://api.themoviedb.org/3/search/person?api_key=${apiKey}&query=${encodeURIComponent(name)}`;
+    personEl.innerHTML = `
+      <img src="${profile_path ? IMG_URL + profile_path : 'images/no-image-available.png'}" alt="${name}" />
+      <div class="movie-info">
+        <h3>${name}</h3>
+      </div>
+      <div class="overview">
+        <h3>Known For</h3>
+        <p>${knownForTitles || 'N/A'}</p>
+      </div>
+    `;
 
-    try {
-        const res = await fetch(url);
-        if (!res.ok) {
-            throw new Error("Failed to fetch data.");
-        }
+    main.appendChild(personEl);
+  });
+}
 
-        const data = await res.json();
-        main.innerHTML = '';
-
-        if (data.results.length === 0) {
-            showMessage("No people found. Try a different name.");
-        } else {
-            data.results.slice(0, 10).forEach(person => {
-                const personEl = document.createElement('div');
-                personEl.classList.add('movie');
-
-                const image = person.profile_path
-                    ? `https://image.tmdb.org/t/p/w500${person.profile_path}`
-                    : 'https://via.placeholder.com/300x450?text=No+Image';
-
-                const knownForList = person.known_for.map(work => {
-                    const type = work.media_type === 'movie' ? 'Movie' : 'TV';
-                    return `<li>${type}: ${work.title || work.name}</li>`;
-                }).join('');
-
-                personEl.innerHTML = `
-                    <img src="${image}" alt="${person.name}">
-                    <div class="movie-info">
-                        <h3>${person.name}</h3>
-                        <span>${person.known_for_department}</span>
-                    </div>
-                    <div class="overview">
-                        <h3>Known For</h3>
-                        <ul>${knownForList}</ul>
-                    </div>
-                `;
-
-                main.appendChild(personEl);
-            });
-        }
-    } catch (err) {
-        console.error(err);
-        showMessage("Oops! Something went wrong. Please try again later.");
-    }
+function getColor(vote) {
+  if (vote >= 8) {
+    return 'green';
+  } else if (vote >= 5) {
+    return 'orange';
+  } else {
+    return 'red';
+  }
 }
